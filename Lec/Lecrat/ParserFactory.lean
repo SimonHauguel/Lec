@@ -6,9 +6,8 @@ open CanProduceParsingResult
 open CanProduceErrorFromContext
 open Lean Std HashMap
 
--- # TODO : Implement Option and Ref
+-- # TODO : *FIX* Option Parser
 -- # TODO : Fix Many & Some Parsers
--- # TODO : Fix Comp Parser
 -- # TODO : Make Something efficient
 -- # TODO : Error handling
 
@@ -45,7 +44,9 @@ partial def plusSequenceParser [CanProduceErrorFromContext β] [Inhabited α] [C
         lastParser with
           result := resultMultiParser newParser.result lastParser.result
       }
-    else newParser
+    else {
+      p with error := some $ fromParserContext p
+    }
 
 partial def manyParser [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α]
   : RatValue α → Parser α β → Parser α β :=
@@ -101,25 +102,42 @@ partial def compToParser [CanProduceErrorFromContext β] [Inhabited α] [CanProd
       p with error := some $ fromParserContext p
     }
 
-partial def Parser.parse [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α] : HashMap Lean.Name (RatValue α) → Lean.Name → Parser α β → Parser α β :=
-  λ r n p => match r.find! n with
-  | STRING a   => metaNameParser a p
-  | OR ⟨a, b⟩   => orSequenceParser a b p
-  | COMP ⟨a, b⟩ => plusSequenceParser a b p
-  | MANY a     => manyParser a p
-  | SOME a     => someParser a p
-  | NAMED a b  => namedParser a b p
-  | COMPTO a f => compToParser a f p
-  | NIL        => p
-  | _          => panic! "Not Yet Implemented"
+partial def optionParser [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α]
+  : RatValue α → Parser α β → Parser α β :=
+  λ r p =>
+    let newParser := p.parseUniqueRatValue r
+    if newParser.error.isNone
+    then newParser
+    else p
 
-partial abbrev Parser.parseUniqueRatValue [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α] : RatValue α → Parser α β → Parser α β :=
-  λ r p => p.parse (HashMap.ofList [⟨`default, r⟩]) `default
+partial def refParser [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α]
+  : Lean.Name →  Parser α β → Parser α β := 
+  λ n p =>
+  if p.extensions.contains n
+  then p.parseUniqueRatValue (p.extensions.find! n) 
+  else panic! s!"Could not find {n} in this context"
 
-partial def Parser.print (p : Parser String Error) : IO Unit :=
-  match p.error with
-  | some _       => println! p.entry ++ " /!\\ Fail"
-  | none         => 
-    println! s!"Rest : {p.entry}\nParsed : {p.result}"
+
+partial def Parser.parse [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α] 
+  : HashMap Lean.Name (RatValue α) → Lean.Name → Parser α β → Parser α β :=
+  λ r n p =>
+  let contextFullParser := {p with extensions := r}
+  if r.contains n then
+  match r.find! n with
+  | STRING a   => metaNameParser a contextFullParser
+  | OR ⟨a, b⟩   => orSequenceParser a b contextFullParser
+  | COMP ⟨a, b⟩ => plusSequenceParser a b contextFullParser
+  | MANY a     => manyParser a contextFullParser
+  | SOME a     => someParser a contextFullParser
+  | NAMED a b  => namedParser a b contextFullParser
+  | COMPTO a f => compToParser a f contextFullParser
+  | OPTION a   => optionParser a contextFullParser
+  | NIL        => contextFullParser
+  | REF a      => refParser a contextFullParser
+  else panic! s!"Unknow binders {n} !"
+
+partial abbrev Parser.parseUniqueRatValue [CanProduceErrorFromContext β] [Inhabited α] [CanProduceParsingResult α] 
+  : RatValue α → Parser α β → Parser α β :=
+  λ r p => p.parse (p.extensions.insert `default r) `default
 
 end
