@@ -15,11 +15,11 @@ inductive Lambda where
 
 protected partial def Lambda.toString : Lambda → String
 | Var n => s!"Var {n}"
-| Abs l => "λ." ++ Lambda.toString l
-| App a b => "(" ++ Lambda.toString a ++ ")(" ++ Lambda.toString b  ++ ")"
+| Abs l => "λ.(" ++ Lambda.toString l ++ ")"
+| App a b => "APP (" ++ Lambda.toString a ++ ")(" ++ Lambda.toString b  ++ ")"
 | Nil => "ERRORNIL"
-| MetaString a => "ERRORMETASTRING"
-| Cons a b => "ERRORCONS"
+| MetaString _ => "ERRORMETASTRING"
+| Cons _ _ => "ERRORCONS"
 
 instance : ToString Lambda where
   toString := Lambda.toString
@@ -47,7 +47,7 @@ partial def Parser.print [ToString α] (p : Parser α Error) : IO Unit :=
 
 Lam IsAGrammarThatProducesA Lambda Where
 
-  `Expr ::= ↑`Var ∣ parens (↑`Expr);;
+  `Expr ::= ↑`App ∣ ↑`Var ∣ ↑`Abs ∣ parens (↑`Expr);;
 
   `Var ::= unique num {> λ bi => 
     match (bi.find! `unique) with
@@ -60,8 +60,12 @@ Lam IsAGrammarThatProducesA Lambda Where
     λ bi => App (bi.find! `fst) (bi.find! `snd)
   <};;
 
-  `Abs ::= $"λ." ⊹ (`val ← parens (↑`Expr)) {> λ bi => Abs (bi.find! `val)<};;
+  `Abs ::= $"λ." ⊹ (`val ← ↑`Expr) {> λ bi => Abs (bi.find! `val)<};;
 
 EndGrammar
 
-#eval (("(3)".mkParserFromString Lambda Error).parse Lam `Expr).print
+/-
+NewInput : 
+Parsed : APP (λ.(Var 1))(APP (λ.(Var 1))(λ.(Var 2)))
+-/
+#eval (("(λ.λ.(1)(2))((λ.1)(λ.2))".mkParserFromString Lambda Error).parse Lam `Expr).print
