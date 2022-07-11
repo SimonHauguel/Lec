@@ -32,16 +32,16 @@ inductive RatValue (α : Type u) where
 
 open RatValue
 
-notation:10 lrv " ∣ "  rrv:10    => OR ⟨lrv, rrv⟩
-notation:54 lrv " ⊹ " rrv:55    => COMP ⟨lrv, rrv⟩
-notation        "*"   rrv:80    => MANY rrv
-notation        "+"   rrv:80    => SOME rrv
-notation        "?"   rrv:70    => OPTION rrv
-notation        "$"   name:90   => STRING name
-notation        "↑"   name:90   => REF name
-notation:45 lrv "←"   rrv:45    => NAMED lrv rrv     
-notation        "ε"             => NIL
-notation:30 lrv "{>" val "<}"   => COMPTO lrv val
+notation:10 lrv "∣" rrv:10    => OR ⟨lrv, rrv⟩
+notation:54 lrv "⊹" rrv:55    => COMP ⟨lrv, rrv⟩
+notation        "*" rrv:80    => MANY rrv
+notation        "+" rrv:80    => SOME rrv
+notation        "?" rrv:70    => OPTION rrv
+notation        "$" name:90   => STRING name
+notation        "↑" name:90   => REF name
+notation:45 lrv "←" rrv:45   => NAMED lrv rrv     
+notation        "ε"           => NIL
+notation:30 lrv "{>" val "<}" => COMPTO lrv val
 
 macro n:term "IsAGrammarThatProducesA" typ:term "Where" terms:many(term) "EndGrammar" :command => 
   `(def $n : HashMap Lean.Name (RatValue $typ) :=
@@ -59,12 +59,15 @@ macro X:term "::=" V:term ";;" :term => `(⟨$X, $V⟩)
 -- Note : pos makes no sens, but you know
 structure Parser (α : Type u) (β : Type u) where
   mkParser ::
-    entry       : String
-    pos         : Int × Int                      := ⟨0, 0⟩ 
-    context     : HashMap Lean.Name α            := empty
-    extensions  : HashMap Lean.Name (RatValue α) := empty
-    error       : Option β                       := none
-    result      : α
+    oneLineComment   : String                         := "//"
+    multiLineComment : String × String                := ⟨"/*", "*/"⟩                          
+    toSkip           : List Char                      := [' ', '\n']
+    entry            : String
+    pos              : Int × Int                      := ⟨0, 0⟩ 
+    context          : HashMap Lean.Name α            := empty
+    extensions       : HashMap Lean.Name (RatValue α) := empty
+    error            : Option β                       := none
+    result           : α
 
 open Parser
 
@@ -87,7 +90,7 @@ class CanProduceErrorFromContext (β : Type u) where
 -- Everything below is "useless", hardcoded and is intended to be deleted soon 
 
 def String.mkParserFromString (entry : String) (α : Type _) [Inhabited α] (β : Type _) : Parser α β :=
-  mkParser entry ⟨0, 0⟩ default default default default
+  mkParser "//" ⟨"/*", "*/"⟩ [' ', '\n'] entry ⟨0, 0⟩ default default default default
 
 instance [Inhabited α] : Inhabited (Parser α β) where
   default := "".mkParserFromString α β
@@ -109,8 +112,8 @@ def stringToNat (s : String) : Int :=
   | "7" => 7
   | "8" => 8
   | "9" => 9
-  | _ => panic! "ERROR String to Nat"
-  
+  | _ => panic "ERROR String to Nat"
+
 instance : CanProduceParsingResult Int where
   resultMetaString := stringToNat
   resultMetaNil := 0
