@@ -32,6 +32,23 @@ inductive RatValue (α : Type u) where
 
 open RatValue
 
+partial def isSame : RatValue α → RatValue α → Bool
+  | OR ⟨a, b⟩, OR ⟨c, d⟩     => isSame a c && isSame b d
+  | COMP ⟨a, b⟩, COMP ⟨c, d⟩ => isSame a c && isSame b d 
+  | NAMED a b, NAMED c d     => a == c && isSame b d
+  | OPTION a, OPTION b       => isSame a b
+  | SOME a, SOME b           => isSame a b
+  | MANY a, MANY b           => isSame a b
+  | COMPTO a _, COMPTO c _   => isSame a c
+  | STRING a, STRING b       => a == b
+  | REF a, REF b             => a == b
+  | NIL, NIL                 => true
+  | _, _                     => false
+
+
+instance : BEq (RatValue α) where
+  beq := isSame
+
 notation:10 lrv "∣" rrv:10    => OR ⟨lrv, rrv⟩
 notation:54 lrv "⊹" rrv:55    => COMP ⟨lrv, rrv⟩
 notation        "*" rrv:80    => MANY rrv
@@ -39,7 +56,7 @@ notation        "+" rrv:80    => SOME rrv
 notation        "?" rrv:70    => OPTION rrv
 notation        "$" name:90   => STRING name
 notation        "↑" name:90   => REF name
-notation:45 lrv "←" rrv:45   => NAMED lrv rrv     
+notation:45 lrv "←" rrv:45    => NAMED lrv rrv     
 notation        "ε"           => NIL
 notation:30 lrv "{>" val "<}" => COMPTO lrv val
 
@@ -56,17 +73,36 @@ macro n:term "IsAGrammarThatProducesA" typ:term "With" depends:term
 
 macro X:term "::=" V:term ";;" :term => `(⟨$X, $V⟩)
 
+abbrev NaiveMap : Type α → Type β → Type (max α β) := λ a b => List (a × b)
+
+def NaiveMap.lookUp [BEq α] [Inhabited β] : NaiveMap α β → α → Option β := 
+  λ nm a =>
+  Id.run $ do
+    let mut res := default
+    let mut find := false
+    for i in nm do
+      if (i.1 == a)
+      then do res := i.2; find := true; break
+      else continue;
+    if find then some res else none
+
+def NaiveMap.lookUp! [ToString α] [ToString β] [BEq α] [Inhabited β] : NaiveMap α β → α → β :=
+  λ nm a => match nm.lookUp a with
+    | some r => r
+    | none   => panic s!"Could not find key {a} in {nm}"
+
 -- Note : pos makes no sens, but you know
 structure Parser (α : Type u) (β : Type u) where
   mkParser ::
-    oneLineComment   : String                         := "//"
-    multiLineComment : String × String                := ⟨"/*", "*/"⟩                          
-    toSkip           : List Char                      := [' ', '\n']
+    cachedParser     : NaiveMap (RatValue α × String) α := default
+    oneLineComment   : String                           := "//"
+    multiLineComment : String × String                  := ⟨"/*", "*/"⟩                          
+    toSkip           : List Char                        := [' ', '\n']
     entry            : String
-    pos              : Int × Int                      := ⟨0, 0⟩ 
-    context          : HashMap Lean.Name α            := empty
-    extensions       : HashMap Lean.Name (RatValue α) := empty
-    error            : Option β                       := none
+    pos              : Int × Int                        := ⟨0, 0⟩ 
+    context          : HashMap Lean.Name α              := empty
+    extensions       : HashMap Lean.Name (RatValue α)   := empty
+    error            : Option β                         := none
     result           : α
 
 open Parser
@@ -90,7 +126,7 @@ class CanProduceErrorFromContext (β : Type u) where
 -- Everything below is "useless", hardcoded and is intended to be deleted soon 
 
 def String.mkParserFromString (entry : String) (α : Type _) [Inhabited α] (β : Type _) : Parser α β :=
-  mkParser "//" ⟨"/*", "*/"⟩ [' ', '\n'] entry ⟨0, 0⟩ default default default default
+  mkParser default "//" ⟨"/*", "*/"⟩ [' ', '\n'] entry ⟨0, 0⟩ default default default default
 
 instance [Inhabited α] : Inhabited (Parser α β) where
   default := "".mkParserFromString α β
