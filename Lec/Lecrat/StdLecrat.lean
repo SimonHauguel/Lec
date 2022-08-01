@@ -2,7 +2,6 @@ import Lec.Lecrat.CoreParser
 import Lec.Lecrat.ParserFactory
 import Std.Data.HashMap
 
-
 open RatValue
 open Lean Std HashMap
 
@@ -13,7 +12,7 @@ open Lean Std HashMap
   | _     => ε
 @[inline] abbrev unique : RatValue α → RatValue α := NAMED `unique 
 @[inline] abbrev between [Inhabited α] (l : RatValue α) (r : RatValue α) (e : RatValue α) : RatValue α := 
-  l ⊹ (unique e) ⊹ r {> getUnique <}
+  l ⊹ (unique e) ⊹ r -+ getUnique;
 @[inline] abbrev parens [Inhabited α] : RatValue α → RatValue α := between ($"(") ($")")
 @[inline] abbrev num : RatValue α :=
   unique $ oneOf "0123456789"
@@ -24,4 +23,4 @@ open Lean Std HashMap
 @[inline] abbrev upperAlpha : RatValue α :=
   unique $ oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 @[inline] abbrev sepBy1 [Inhabited α] (sep : RatValue α) (toParse : RatValue α) : RatValue α :=
-  toParse ⊹ *(sep ⊹ unique toParse {> getUnique <})
+  toParse ⊹ *(sep ⊹ unique toParse -+ getUnique;)
