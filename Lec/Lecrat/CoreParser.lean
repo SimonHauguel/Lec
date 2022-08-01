@@ -64,7 +64,7 @@ notation        "$" name:90     => STRING name
 notation        "↑" name:90     => REF name
 notation:45 lrv "←" rrv:45      => NAMED lrv rrv     
 notation        "ε"             => NIL
-notation:30 lrv "-+" val:30 ";" => COMPTO lrv val
+notation:30 lrv "~>" val:30 ";" => COMPTO lrv val
 
 macro n:ident "IsAGrammarThatProducesA" typ:term "Where" terms:many(term) "EndGrammar" :command => 
   `(def $n : PartialGrammar $typ :=
